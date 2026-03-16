@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>QR Futam Stopper</title>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <style>
+        :root { --primary: #00ff88; --bg: #121212; --surface: #1e1e1e; --text: #ffffff; --accent: #292929; }
+        body { margin: 0; padding: 0; font-family: sans-serif; background-color: var(--bg); color: var(--text); display: flex; justify-content: center; overscroll-behavior: none; }
+        .app-container { width: 100%; max-width: 500px; min-height: 100vh; display: flex; flex-direction: column; padding: 15px; box-sizing: border-box; }
+        header h1 { text-align: center; color: var(--primary); font-size: 1.4rem; margin: 10px 0; text-transform: uppercase; letter-spacing: 2px; }
+        .timer-section { background: var(--surface); padding: 20px; border-radius: 20px; text-align: center; margin-bottom: 20px; border: 1px solid var(--accent); box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
+        #stopper-kijelzo { font-family: monospace; font-size: 3.2rem; font-weight: bold; color: var(--primary); margin-bottom: 10px; }
+        #uzenet { font-size: 0.95rem; min-height: 3em; color: #ccc; line-height: 1.5; }
+        .scanner-section { flex-grow: 1; background: #000; border-radius: 20px; overflow: hidden; border: 2px solid var(--accent); position: relative; }
+        #olvaso-terulet { width: 100% !important; }
+        .controls { margin-top: 15px; display: flex; flex-direction: column; gap: 10px; }
+        button { padding: 15px; border-radius: 12px; font-weight: bold; text-transform: uppercase; cursor: pointer; border: none; font-size: 0.9rem; }
+        #save-btn { background: var(--primary); color: #000; display: none; } /* Csak a célban jelenik meg */
+        .btn-reset { background: var(--accent); color: #aaa; border: 1px solid #444; }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <header><h1>QR Futam</h1></header>
+    <div class="timer-section">
+        <div id="stopper-kijelzo">00:00.00</div>
+        <p id="uzenet">Szkenneld a <b>"start"</b> kódot!</p>
+    </div>
+    <div class="scanner-section"><div id="olvaso-terulet"></div></div>
+    <div class="controls">
+        <button id="save-btn">Eredmény Mentése (.txt)</button>
+        <button class="btn-reset" onclick="location.reload()">Új futam / Reset</button>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const kijelzo = document.getElementById('stopper-kijelzo');
+        const uzenet = document.getElementById('uzenet');
+        const saveBtn = document.getElementById('save-btn');
+        const html5QrCode = new Html5Qrcode("olvaso-terulet");
+        
+        let stopperFut = false, kezdIdo, intervallum, utolsoKod = "", utolsoIdo = 0;
+        const sorrend = ['40', '32', '31', '37', '35'];
+        let sorrendIndex = 0;
+
+        function frissit() {
+            const eltelt = Date.now() - kezdIdo;
+            const p = Math.floor(eltelt / 60000);
+            const m = Math.floor((eltelt % 60000) / 1000);
+            const ms = Math.floor((eltelt % 1000) / 10);
+            kijelzo.textContent = `${String(p).padStart(2,'0')}:${String(m).padStart(2,'0')}.${String(ms).padStart(2,'0')}`;
+        }
+
+        async function onScanSuccess(decodedText) {
+            const most = Date.now();
+            const szoveg = decodedText.toLowerCase().trim();
+            if (szoveg === utolsoKod && (most - utolsoIdo < 2000)) return;
+
+            // 1. START
+            if (szoveg === 'start' && !stopperFut) {
+                kezdIdo = Date.now(); stopperFut = true; sorrendIndex = 0;
+                utolsoKod = szoveg; utolsoIdo = most;
+                intervallum = setInterval(frissit, 50);
+                uzenet.innerHTML = "<b>FUTÁS!</b> Következő kód: <b style='color:var(--primary)'>40</b>";
+                saveBtn.style.display = "none";
+                if (navigator.vibrate) navigator.vibrate(100);
+                return;
+            }
+
+            // 2. ELLENŐRZŐ PONTOK
+            if (stopperFut && szoveg === sorrend[sorrendIndex]) {
+                utolsoKod = szoveg; utolsoIdo = most;
+                sorrendIndex++;
+                if (navigator.vibrate) navigator.vibrate(50);
+                if (sorrendIndex === sorrend.length) {
+                    uzenet.innerHTML = "Minden pont OK! Irány a <b style='color:var(--primary)'>STOP</b>!";
+                } else {
+                    uzenet.innerHTML = `Pipa: ${szoveg}. Következő: <b style='color:var(--primary)'>${sorrend[sorrendIndex]}</b>`;
+                }
+                return;
+            }
+
+            // 3. STOP
+            if (szoveg === 'stop' && stopperFut) {
+                if (sorrendIndex === sorrend.length) {
+                    stopperFut = false;
+                    clearInterval(intervallum);
+                    utolsoKod = szoveg; utolsoIdo = most;
+                    uzenet.innerHTML = "<b style='color:var(--primary)'>CÉLBA ÉRTÉL!</b>";
+                    saveBtn.style.display = "block";
+                    if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+                    
+                    // Kamera leállítása a célban, hogy ne zavarjon
+                    html5QrCode.stop().catch(() => {}); 
+                } else {
+                    uzenet.innerHTML = `<b style='color:red'>HIÁNYZÓ PONTOK!</b><br>Még kell: ${sorrend.slice(sorrendIndex).join(', ')}`;
+                }
+            }
+        }
+
+        // MENTÉS FUNKCIÓ
+        saveBtn.addEventListener('click', () => {
+            const nev = prompt("Add meg a neved az eredményhez:", "Versenyző");
+            if (!nev) return;
+            const tartalom = `--- QR FUTAM EREDMÉNY ---\nNév: ${nev}\nIdőeredmény: ${kijelzo.textContent}\nDátum: ${new Date().toLocaleString()}`;
+            const blob = new Blob([tartalom], { type: 'text/plain' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `eredmeny_${nev.replace(/\s+/g, '_')}.txt`;
+            link.click();
+        });
+
+        // Kamera indítása
+        html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, onScanSuccess)
+            .catch(err => uzenet.innerHTML = "<span style='color:red'>Hiba: Nincs kamera engedély vagy nem HTTPS!</span>");
+    });
+</script>
+</body>
+</html>
