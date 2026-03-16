@@ -3,23 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>QR Futam Stopper</title>
+    <title>QR Futam - Pályaválasztó</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         :root { --primary: #00ff88; --bg: #121212; --surface: #1e1e1e; --text: #ffffff; --accent: #292929; --error: #ff4444; }
         body { margin: 0; padding: 0; font-family: sans-serif; background-color: var(--bg); color: var(--text); display: flex; justify-content: center; overscroll-behavior: none; }
         .app-container { width: 100%; max-width: 500px; min-height: 100vh; display: flex; flex-direction: column; padding: 15px; box-sizing: border-box; }
         header h1 { text-align: center; color: var(--primary); font-size: 1.4rem; margin: 5px 0; text-transform: uppercase; }
-        
         .timer-section { background: var(--surface); padding: 15px; border-radius: 20px; text-align: center; margin-bottom: 15px; border: 1px solid var(--accent); }
-        /* Kisebb stopper betűméret */
         #stopper-kijelzo { font-family: monospace; font-size: 2.2rem; font-weight: bold; color: var(--primary); margin-bottom: 5px; }
-        /* Nagyobb uzenet betűméret a pontokhoz */
         #uzenet { font-size: 1.2rem; min-height: 3.5em; color: #ccc; line-height: 1.4; font-weight: 500; }
-        
         .scanner-section { flex-grow: 1; background: #000; border-radius: 20px; overflow: hidden; border: 2px solid var(--accent); position: relative; }
         #olvaso-terulet { width: 100% !important; }
-        
         .controls { margin-top: 15px; display: flex; flex-direction: column; gap: 8px; }
         button { padding: 14px; border-radius: 12px; font-weight: bold; text-transform: uppercase; cursor: pointer; border: none; font-size: 0.85rem; }
         #save-btn { background: var(--primary); color: #000; display: none; }
@@ -34,23 +29,22 @@
     <header><h1>QR Futam</h1></header>
     <div class="timer-section">
         <div id="stopper-kijelzo">00:00.0</div>
-        <p id="uzenet">Szkenneld a <b>"start"</b> kódot!</p>
+        <p id="uzenet">Melyik pályát szeretnéd választani?<br><small>Olvasd be a pálya kódját!</small></p>
     </div>
     <div class="scanner-section"><div id="olvaso-terulet"></div></div>
     <div class="controls">
         <button id="save-btn">Eredmény Mentése (.txt)</button>
         <button id="abort-btn">Futam Feladása</button>
-        <button class="btn-reset" onclick="location.reload()">Reset / Újraindítás</button>
+        <button class="btn-reset" onclick="location.reload()">Reset / Új pálya</button>
         <button class="btn-exit" onclick="kilepes()">Kilépés</button>
     </div>
 </div>
 
 <script>
     function kilepes() {
-        if (confirm("Biztosan be akarod zárni az ablakot?")) {
+        if (confirm("Bezárja az ablakot?")) {
             window.close();
-            // Ha a window.close nem működne (böngésző korlátozás miatt), visszairányítunk:
-            setTimeout(() => { alert("A böngésződ biztonsági okokból nem engedi az ablak bezárását. Kérlek, zárd be manuálisan!"); }, 500);
+            setTimeout(() => { alert("Kérjük, zárja be az ablakot manuálisan!"); }, 500);
         }
     }
 
@@ -62,14 +56,14 @@
         const html5QrCode = new Html5Qrcode("olvaso-terulet");
         
         let stopperFut = false, kezdIdo, intervallum, utolsoKod = "", utolsoIdo = 0;
-        const sorrend = ['40', '32', '31', '37', '35'];
+        let sorrend = []; 
         let sorrendIndex = 0;
 
         function frissit() {
             const eltelt = Date.now() - kezdIdo;
             const p = Math.floor(eltelt / 60000);
             const m = Math.floor((eltelt % 60000) / 1000);
-            const tized = Math.floor((eltelt % 1000) / 100); // Csak tizedmásodperc
+            const tized = Math.floor((eltelt % 1000) / 100);
             kijelzo.textContent = `${String(p).padStart(2,'0')}:${String(m).padStart(2,'0')}.${tized}`;
         }
 
@@ -78,64 +72,80 @@
             const szoveg = decodedText.toLowerCase().trim();
             if (szoveg === utolsoKod && (most - utolsoIdo < 2000)) return;
 
-            if (szoveg === 'start' && !stopperFut) {
-                kezdIdo = Date.now(); stopperFut = true; sorrendIndex = 0;
-                utolsoKod = szoveg; utolsoIdo = most;
-                intervallum = setInterval(frissit, 100); // 100ms-enként frissít a tizedekhez
-                uzenet.innerHTML = "START!<br>Következő kód: <b style='color:var(--primary)'>40</b>";
-                saveBtn.style.display = "none";
-                abortBtn.style.display = "block";
-                if (navigator.vibrate) navigator.vibrate(100);
+            // 1. PÁLYAVÁLASZTÁS ÉS RAJT (start:pontok)
+            if (szoveg.startsWith('start:') && !stopperFut) {
+                try {
+                    const palyaAdat = szoveg.replace('start:', '');
+                    sorrend = palyaAdat.split(',').map(s => s.trim()).filter(s => s !== "");
+                    
+                    if (sorrend.length > 0) {
+                        kezdIdo = Date.now(); stopperFut = true; sorrendIndex = 0;
+                        utolsoKod = szoveg; utolsoIdo = most;
+                        intervallum = setInterval(frissit, 100);
+                        uzenet.innerHTML = `<b style="color:var(--primary)">PÁLYA ELINDULT!</b><br>Következő pont: <b>${sorrend[0]}</b>`;
+                        saveBtn.style.display = "none";
+                        abortBtn.style.display = "block";
+                        if (navigator.vibrate) navigator.vibrate(100);
+                    }
+                } catch(e) {
+                    uzenet.innerHTML = "<b style='color:var(--error)'>Hibás pálya kód!</b>";
+                }
                 return;
             }
 
             if (stopperFut) {
+                // 2. ELLENŐRZŐ PONTOK
                 if (szoveg === sorrend[sorrendIndex]) {
                     utolsoKod = szoveg; utolsoIdo = most;
                     sorrendIndex++;
                     if (navigator.vibrate) navigator.vibrate(50);
                     if (sorrendIndex === sorrend.length) {
-                        uzenet.innerHTML = "Minden pont megvan!<br>Irány a <b style='color:var(--primary)'>STOP</b>!";
+                        uzenet.innerHTML = "<b>Minden pont megvan!</b><br>Irány a <b style='color:var(--primary)'>STOP</b>!";
                     } else {
                         uzenet.innerHTML = `Pipa: ${szoveg}<br>Következő: <b style='color:var(--primary)'>${sorrend[sorrendIndex]}</b>`;
                     }
                 } 
-                else if (szoveg !== 'stop' && szoveg !== 'start' && szoveg !== utolsoKod) {
-                    uzenet.innerHTML = `<b style='color:var(--error)'>Ez nem a soron következő pontod!</b><br>Keresd ezt: <b style='color:var(--primary)'>${sorrend[sorrendIndex]}</b>`;
+                // 3. STOP KÓD
+                else if (szoveg === 'stop') {
+                    if (sorrendIndex === sorrend.length) {
+                        stopperFut = false;
+                        clearInterval(intervallum);
+                        uzenet.innerHTML = "<b style='color:var(--primary)'>Ügyes voltál!</b><br>Célba értél!";
+                        saveBtn.style.display = "block";
+                        abortBtn.style.display = "none";
+                        if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+                        html5QrCode.stop().catch(() => {}); 
+                    } else {
+                        uzenet.innerHTML = `<b style='color:var(--error)'>HIÁNYZÓ PONTOK!</b><br>Kell még: ${sorrend.slice(sorrendIndex).join(', ')}`;
+                    }
                 }
-            }
-
-            if (szoveg === 'stop' && stopperFut) {
-                if (sorrendIndex === sorrend.length) {
-                    stopperFut = false;
-                    clearInterval(intervallum);
-                    utolsoKod = szoveg; utolsoIdo = most;
-                    uzenet.innerHTML = "<b style='color:var(--primary)'>Ügyes voltál!</b><br>Célba értél!";
-                    saveBtn.style.display = "block";
-                    abortBtn.style.display = "none";
-                    if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
-                    html5QrCode.stop().catch(() => {}); 
-                } else {
-                    uzenet.innerHTML = `<b style='color:var(--error)'>HIÁNYZÓ PONTOK!</b><br>Még kell: ${sorrend.slice(sorrendIndex).join(', ')}`;
+                // 4. ROSSZ PONT VAGY ÚJRA-START PRÓBÁLKOZÁS
+                else if (szoveg !== utolsoKod) {
+                    if (szoveg.startsWith('start:')) {
+                        uzenet.innerHTML = "<b style='color:var(--error)'>A futam már fut!</b><br>Előbb add fel a jelenlegit.";
+                    } else {
+                        uzenet.innerHTML = `<b style='color:var(--error)'>Nem ez következik!</b><br>Keresd ezt: <b style='color:var(--primary)'>${sorrend[sorrendIndex]}</b>`;
+                    }
                 }
             }
         }
 
         abortBtn.addEventListener('click', () => {
-            if (confirm("Biztosan feladod?")) {
+            if (confirm("Valóban feladod a pályát?")) {
                 stopperFut = false;
                 clearInterval(intervallum);
                 kijelzo.textContent = "00:00.0";
-                uzenet.innerHTML = "Feladva. Szkenneld a <b>start</b> kódot az újrakezdéshez!";
+                uzenet.innerHTML = "Melyik pályát szeretnéd választani?<br><small>Olvasd be a pálya kódját!</small>";
                 abortBtn.style.display = "none";
-                sorrendIndex = 0;
+                sorrend = [];
+                utolsoKod = "";
             }
         });
 
         saveBtn.addEventListener('click', () => {
             const nev = prompt("Neved:", "Versenyző");
             if (!nev) return;
-            const tartalom = `--- QR FUTAM ---\nNév: ${nev}\nIdő: ${kijelzo.textContent}\nDátum: ${new Date().toLocaleString()}`;
+            const tartalom = `--- QR FUTAM ---\nNév: ${nev}\nIdő: ${kijelzo.textContent}\nPontok: ${sorrend.join(',')}`;
             const blob = new Blob([tartalom], { type: 'text/plain' });
             const link = document.createElement('a');
             link.href = URL.createObjectURL(blob);
