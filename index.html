@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>QR Futam - Pályaválasztó</title>
+    <title>Mátrix Futam - Pályaválasztó</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         :root { --primary: #00ff88; --bg: #121212; --surface: #1e1e1e; --text: #ffffff; --accent: #292929; --error: #ff4444; }
@@ -26,7 +26,7 @@
 <body>
 
 <div class="app-container">
-    <header><h1>QR Futam</h1></header>
+    <header><h1>Mátrix Futam</h1></header>
     <div class="timer-section">
         <div id="stopper-kijelzo">00:00.0</div>
         <p id="uzenet">Melyik pályát szeretnéd választani?<br><small>Olvasd be a pálya kódját!</small></p>
@@ -35,7 +35,7 @@
     <div class="controls">
         <button id="save-btn">Eredmény Mentése (.txt)</button>
         <button id="abort-btn">Futam Feladása</button>
-        <button class="btn-reset" onclick="location.reload()">Reset / Új pálya</button>
+       // <button class="btn-reset" onclick="location.reload()">Reset / Új pálya</button>
         <button class="btn-exit" onclick="kilepes()">Kilépés</button>
     </div>
 </div>
@@ -131,7 +131,7 @@
         }
 
         abortBtn.addEventListener('click', () => {
-            if (confirm("Valóban feladod a pályát?")) {
+            if (confirm("Valóban feladod a pályát? <br>Az eddigi eredményed el fog veszni!")) {
                 stopperFut = false;
                 clearInterval(intervallum);
                 kijelzo.textContent = "00:00.0";
@@ -145,7 +145,7 @@
         saveBtn.addEventListener('click', () => {
             const nev = prompt("Neved:", "Versenyző");
             if (!nev) return;
-            const tartalom = `--- QR FUTAM ---\nNév: ${nev}\nIdő: ${kijelzo.textContent}\nPontok: ${sorrend.join(',')}`;
+            const tartalom = `--- Mátrix FUTAM ---\nNév: ${nev}\nIdő: ${kijelzo.textContent}\nPontok: ${sorrend.join(',')}`;
             const blob = new Blob([tartalom], { type: 'text/plain' });
             const link = document.createElement('a');
             link.href = URL.createObjectURL(blob);
